@@ -23,6 +23,9 @@ should_exit = False
 # 全局回调函数，用于通知主程序AI输出的坐标
 coordinate_callback = None
 
+# 全局上下文历史记录（保存最近3次）
+conversation_history = []
+
 current_os = platform.system()
 
 # 命令行日志打印函数
@@ -384,15 +387,15 @@ def parse_ai_response(response_text):
             text = text_match.group(1) if text_match else ""
         
         return AIResponse(
-            action=action, 
-            coordinate=coordinate, 
-            coordinates=coordinates,
-            text=text, 
-            type_information=type_information,
-            reasoning=reasoning,
-            whether_completed=whether_completed,
+            status=response_data.get('status', 'in_progress'),
+            description=response_data.get('description', ''),
+            target=response_data.get('target', ''),
+            action=response_data.get('action', {}),
             current_status=current_status,
-            element_info=element_info
+            whether_completed=whether_completed,
+            element_info=element_info,
+            coordinates=coordinates,
+            type_information=type_information or text
         )
         
     except Exception as e:
@@ -491,19 +494,26 @@ def auto_control_computer(user_content):
         # 清理用户输入中的无效字符
         clean_user_content = user_content.encode('utf-8', errors='ignore').decode('utf-8')
         
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": clean_user_content},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{base64_image}"}
-                    }
-                ]
-            }
-        ]
+        # 构建消息列表，包含最近3次的上下文
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # 添加历史上下文（最近3次）
+        for history_item in conversation_history[-3:]:
+            messages.append(history_item["user_message"])
+            messages.append(history_item["assistant_message"])
+        
+        # 添加当前用户消息
+        current_user_message = {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": clean_user_content},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{base64_image}"}
+                }
+            ]
+        }
+        messages.append(current_user_message)
         
         try:
             response = client.chat.completions.create(
@@ -517,6 +527,17 @@ def auto_control_computer(user_content):
             # 清理AI响应中的无效字符
             ai_response_text = ai_response_text.encode('utf-8', errors='ignore').decode('utf-8')
             log_print(f"🤖 AI原始响应:\n{ai_response_text}")
+            
+            # 保存到历史记录
+            history_item = {
+                "user_message": current_user_message,
+                "assistant_message": {"role": "assistant", "content": ai_response_text}
+            }
+            conversation_history.append(history_item)
+            
+            # 只保留最近3次记录
+            if len(conversation_history) > 3:
+                conversation_history.pop(0)
             
             # 解析并执行操作
             ai_response = parse_ai_response(ai_response_text)
