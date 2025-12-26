@@ -1,5 +1,5 @@
 """
-包豆电脑 - AI 智能控制系统 (命令行版本核心模块)
+AI 智能控制系统 (命令行版本核心模块)
 完全照搬GUI版本逻辑
 """
 
@@ -426,7 +426,7 @@ def auto_control_computer(user_content):
     client = OpenAI(api_key=api_key, base_url=base_url)
     
     # 读取系统提示（使用新版本prompt）
-    system_prompt_file = "get_next_action_AI_doubao_mac_new.txt" if current_os == "Darwin" else "get_next_action_AI_doubao_new.txt"
+    system_prompt_file = "get_next_action_AI_mac_new.md" if current_os == "Darwin" else "get_next_action_AI_new.md"
     
     try:
         # 尝试多种编码方式读取文件
